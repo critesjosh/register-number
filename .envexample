@@ -1,0 +1,3 @@
+PRIVATE_KEY="your private key" # ie "0xcaf5634ee58632e620ba63494da6ee3a2ba49ff7b1ea29fe553801dec499b1ae"
+NETWORK="alfajores" # or mainnet
+PHONE_NUMBER="phone number to register" # "+11234567890"
