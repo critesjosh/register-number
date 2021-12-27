@@ -210,7 +210,7 @@ const postAttestationRequest = async (attestationToComplete) => {
     return response.json()
 }
 
-// NOTE: this is currently a janky way of getting a prefix code for alfajores
+// NOTE: this is currently a janky way of getting a prefix code for alfajores, need to update for mainnet
 const getSecurityPrefix = (attestationToComplete) => attestationToComplete.name[10]
 
 // lookup the phoneHash and pepper for given account
