@@ -1,154 +1,144 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Web3ReactProvider, useWeb3React } from '@web3-react/core'
-import { newKitFromWeb3 } from '@celo/contractkit';
-import Web3 from "web3";
-import { Web3Provider } from '@ethersproject/providers'
-import { formatEther } from '@ethersproject/units'
-import { InjectedConnector } from '@web3-react/injected-connector'
-import { rmSync } from 'fs';
+import { StableToken } from '@celo/contractkit';
+import { ensureLeading0x } from '@celo/utils/lib/address';
+import {
+  Alfajores,
+  Baklava,
+  Mainnet,
+  useContractKit,
+  ContractKitProvider
+} from '@celo-tools/use-contractkit';
+import { BigNumber } from 'bignumber.js';
+import Head from 'next/head';
+import { useCallback, useEffect, useState } from 'react';
+import Web3 from 'web3';
 const OdisUtils = require('@celo/identity').OdisUtils
 
-function getLibrary(provider: any): Web3Provider {
-  const web3 = new Web3(provider)
-  const contractkit = newKitFromWeb3(web3)
-  const library = contractkit.connection.web3.givenProvider
-  return library
+import { PrimaryButton, SecondaryButton, toast } from '../components';
+
+function truncateAddress(address: string) {
+  return `${address.slice(0, 8)}...${address.slice(36)}`;
 }
 
+const networks = [Alfajores, Baklava, Mainnet];
+
+const defaultSummary = {
+  name: '',
+  address: '',
+  wallet: '',
+  celo: new BigNumber(0),
+  cusd: new BigNumber(0),
+  ceur: new BigNumber(0),
+};
+
 function App() {
-  const context = useWeb3React<Web3Provider>()
-  const { connector, library, chainId, account, activate, deactivate, active, error } = context
-  const injected = new InjectedConnector({ supportedChainIds: [1, 3, 4, 5, 42, 44787] })
-
-  const [contractKit, setcontractKit] = useState(null)
-
-  // handle logic to recognize the connector currently being activated
-  const [activatingConnector, setActivatingConnector] = React.useState<any>()
-  React.useEffect(() => {
-    if (activatingConnector && activatingConnector === connector) {
-      setActivatingConnector(undefined)
-    }
-  }, [activatingConnector, connector])
+  const {
+    kit,
+    address,
+    network,
+    updateNetwork,
+    connect,
+    destroy,
+    performActions,
+    walletType,
+  } = useContractKit();
+  const [summary, setSummary] = useState(defaultSummary);
   
+  const fetchSummary = useCallback(async () => {
+    if (!address) {
+      setSummary(defaultSummary);
+      return;
+    }
+
+    const [accounts, goldToken, cUSD, cEUR] = await Promise.all([
+      kit.contracts.getAccounts(),
+      kit.contracts.getGoldToken(),
+      kit.contracts.getStableToken(StableToken.cUSD),
+      kit.contracts.getStableToken(StableToken.cEUR),
+    ]);
+
+    const [summary, celo, cusd, ceur] = await Promise.all([
+      accounts.getAccountSummary(address).catch((e) => {
+        console.error(e);
+        return defaultSummary;
+      }),
+      goldToken.balanceOf(address),
+      cUSD.balanceOf(address),
+      cEUR.balanceOf(address),
+    ]);
+    setSummary({
+      ...summary,
+      celo,
+      cusd,
+      ceur,
+    });
+  }, [address, kit]);
+
   return (
     <>
-      <Account/>
-      <button onClick={() => {
-          setActivatingConnector(injected)
-          activate(injected)
-        }}>Connect to metamask</button>
-        <button onClick={() => {deactivate()}}>Disconnect</button>
-      <ChainId/>
+      <Connect/>
       <Lookup/>
     </>
   )
 }
 
-function ChainId() {
-  const { chainId } = useWeb3React()
+// function ChainId() {
+//   const { chainId } = useWeb3React()
 
+//   return (
+//     <>
+//       <span>Chain Id</span>
+//       <span role="img" aria-label="chain">
+//         ⛓
+//       </span>
+//       <span>{chainId ?? ''}</span>
+//     </>
+//   )
+// }
+
+function Connect() {
+  const { address, destroy, connect } = useContractKit()
   return (
     <>
-      <span>Chain Id</span>
-      <span role="img" aria-label="chain">
-        ⛓
-      </span>
-      <span>{chainId ?? ''}</span>
-    </>
-  )
-}
-
-function Balance() {
-  const { account, library, chainId } = useWeb3React()
-
-  const [balance, setBalance] = React.useState()
-  React.useEffect((): any => {
-    if (!!account && !!library) {
-      let stale = false
-
-      library
-        .getBalance(account)
-        .then((balance: any) => {
-          if (!stale) {
-            setBalance(balance)
-          }
-        })
-        .catch(() => {
-          if (!stale) {
-            setBalance(null)
-          }
-        })
-
-      return () => {
-        stale = true
-        setBalance(undefined)
-      }
-    }
-  }, [account, library, chainId]) // ensures refresh if referential identity of library doesn't change across chainIds
-
-  return (
-    <>
-      <span>Balance</span>
-      <span role="img" aria-label="gold">
-        💰
-      </span>
-      <span>{balance === null ? 'Error' : balance ? `Ξ${formatEther(balance)}` : ''}</span>
-    </>
-  )
-}
-
-export default function() {
-  return (
-    <Web3ReactProvider getLibrary={getLibrary}>
-      <App />
-    </Web3ReactProvider>
-  )
-}
-
-function Account() {
-  const { account } = useWeb3React()
-
-  return (
-    <>
-      <span>Account</span>
-      <span role="img" aria-label="robot">
-        🤖
-      </span>
-      <span>
-        {account === null
-          ? '-'
-          : account
-          ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}`
-          : ''}
-      </span>
+    <p>{address}</p>
+        {address ? (
+                <SecondaryButton onClick={destroy}>Disconnect</SecondaryButton>
+              ) : (
+                <SecondaryButton
+                  onClick={() =>
+                    connect().catch((e) => toast.error((e as Error).message))
+                  }
+                >
+                  Connect
+                </SecondaryButton>
+              )}
     </>
   )
 }
 
 function Lookup(){
-  const context = useWeb3React<Web3Provider>()
+  const {
+    kit,
+    address,
+    network,
+    updateNetwork,
+    connect,
+    destroy,
+    performActions,
+    walletType,
+  } = useContractKit();
 
-  const { connector, library, chainId, account, activate, deactivate, active, error } = context
-  const [contractKit, setcontractKit] = useState(null)
   const [response, setResponse] = useState(null)
 
   let odisUrl, odisPubKey, phoneNumber = '+13132880080', lookupAccount = '0xd32dc3ef59cb45d6b8c82b807a51b52ebdb9cbb4'
 
-
   async function lookup(){
-
-    const web3 = new Web3(window.ethereum)
-    console.log(web3)
-    const contractKit = newKitFromWeb3(web3)
-    console.log(contractKit)
-    setcontractKit(contractKit)
 
     const authSigner = {
       authenticationMethod: OdisUtils.Query.AuthenticationMethod.WALLET_KEY,
-      contractKit: contractKit
+      contractKit: kit
     }
 
-    switch (chainId.toString(10)) {
+    switch (network.chainId.toString(10)) {
       case '44787':
         odisUrl = 'https://us-central1-celo-phone-number-privacy.cloudfunctions.net'
         odisPubKey = 'kPoRxWdEdZ/Nd3uQnp3FJFs54zuiS+ksqvOm9x8vY6KHPG8jrfqysvIRU0wtqYsBKA7SoAsICMBv8C/Fb2ZpDOqhSqvr/sZbZoHmQfvbqrzbtDIPvUIrHgRS0ydJCMsA'
@@ -186,4 +176,19 @@ function Lookup(){
     {response}
     </>
   )
+}
+
+export default function WrappedApp() {
+  return (
+    <ContractKitProvider
+      dapp={{
+        name: 'My awesome dApp',
+        description: 'My awesome description',
+        url: 'https://example.com',
+        icon: ''
+      }}
+    >
+      <App />
+    </ContractKitProvider>
+  );
 }
