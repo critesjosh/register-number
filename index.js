@@ -43,6 +43,8 @@ async function getHashAndPepper(){
   const response = await lookup(phoneNumber, account)
   pepper = response.pepper
   phoneHash = response.phoneHash
+  console.log(`Pepper: ${pepper}`)
+  console.log(`Phone hash: ${phoneHash}`)
 }
 
 
@@ -58,7 +60,7 @@ example mapping:
 async function getIdentifiers(){
   const attestationsContract = await contractkit.contracts.getAttestations()
   let mapping = await attestationsContract.lookupIdentifiers([phoneHash])
-  console.log(mapping)
+  console.log(`Phone hash -> address mapping: ${mapping}`)
 }
 
 
