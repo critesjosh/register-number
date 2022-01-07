@@ -15,6 +15,8 @@ const OdisUtils = require('@celo/identity').OdisUtils
 
 import { PrimaryButton, SecondaryButton, toast } from '../components';
 
+import { WebBlsBlindingClient } from '../utils/bls-blinding-client'
+
 function truncateAddress(address: string) {
   return `${address.slice(0, 8)}...${address.slice(36)}`;
 }
@@ -156,13 +158,17 @@ function Lookup(){
       odisPubKey
     }
 
-    console.log(authSigner, serviceContext)
-  
+    const blsBlindingClient = new WebBlsBlindingClient(serviceContext.odisPubKey)
+
     const response = await OdisUtils.PhoneNumberIdentifier.getPhoneNumberIdentifier(
       phoneNumber,
       lookupAccount,
       authSigner,
-      serviceContext
+      serviceContext,
+      '', // self phone hash
+      '0.0.1', // client version
+      blsBlindingClient,
+      '' // session id
     )
 
       console.log(response)
