@@ -9,10 +9,10 @@ function MyApp({ Component, pageProps }) {
   return (
     <ContractKitProvider
       dapp={{
-        name: 'use-contractkit demo',
+        name: 'Register phone number app',
         description: 'A demo DApp to showcase functionality',
-        url: 'https://use-contractkit.vercel.app',
-        icon: 'https://use-contractkit.vercel.app/favicon.ico',
+        url: '',
+        icon: '',
       }}
       network={Alfajores}
     >
