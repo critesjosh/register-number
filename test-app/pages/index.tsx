@@ -163,7 +163,7 @@ function Connect() {
 }
 
 function Lookup() {
-  const { kit, network } = useContractKit();
+  const { kit, network, performActions } = useContractKit();
 
   const defaultResponse = {
     status: "",
@@ -177,8 +177,13 @@ function Lookup() {
   const [response, setResponse] = useState(defaultResponse);
   const [phoneNumber, setPhoneNumber] = useState("+13132880080");
   const [mapping, setMapping] = useState(null);
+  const [attestationsFeeApproved, setAttestationFeeAprpoved] = useState(false);
+  const [attestationsContract, setAttestationsContract] = useState(null);
+  const [attestationIssuers, setAttestationIssuers] = useState([]);
 
   const makeRequest = async () => {
+    await sendRequestTransaction();
+
     const lookupData = {
       network: network.chainId.toString(10),
       phoneNumber: phoneNumber,
@@ -193,29 +198,127 @@ function Lookup() {
     });
 
     let tmpResponse = await res.clone();
-    console.log(tmpResponse); // log the res.body
+    console.log(tmpResponse); // log the res.body, not cloning breaks this
 
-    await setResponse({
+    setResponse({
       //@ts-ignore
       status: res.status,
       body: await res.json(),
       limit: res.headers.get("X-RateLimit-Limit"),
       remaining: res.headers.get("X-RateLimit-Remaining"),
     });
+  };
 
-    if (tmpResponse.status == 200) {
-      getIdentifiers();
+  const getIdentifiers = async () => {
+    const attestations = await kit.contracts.getAttestations();
+    setAttestationsContract(attestations);
+    let res = await attestations.lookupIdentifiers([response.body.phoneHash]);
+    setMapping(res);
+    console.log("mapping response", res);
+  };
+
+  const sendRequestTransaction = async () => {
+    try {
+      await performActions(async (k) => {
+        const celo = await k.contracts.getGoldToken();
+        await celo
+          .transfer(
+            // server account, to keep up ODIS quota
+            "0x9d10d841Af74FC5A4799fa605038711B4E17CfE4",
+            Web3.utils.toWei("0.01", "ether")
+          )
+          .sendAndWaitForReceipt({
+            from: k.defaultAccount,
+            gasPrice: Web3.utils.toWei("0.5", "gwei"),
+          });
+      });
+
+      toast.success("sendTransaction succeeded");
+      // await fetchSummary();
+    } catch (e) {
+      toast.error((e as Error).message);
     }
   };
 
-  async function getIdentifiers() {
-    const attestationsContract = await kit.contracts.getAttestations();
-    let res = await attestationsContract.lookupIdentifiers([
+  const approveAttestationFee = async () => {
+    try {
+      await performActions(async (k) => {
+        /**
+         * Approves the necessary amount of StableToken to request Attestations
+         * @param attestationsRequested The number of attestations to request
+         */
+        const approve = await attestationsContract.approveAttestationFee(3);
+        await approve.sendAndWaitForReceipt({
+          gasPrice: Web3.utils.toWei("0.5", "gwei"),
+        });
+      });
+      setAttestationFeeAprpoved(true);
+      toast.success("approveAttestationFee succeeded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const requestNewAttestation = async () => {
+    try {
+      await performActions(async (k) => {
+        /**
+         * Requests a new attestation
+         * @param identifier Attestation identifier (e.g. phone hash)
+         * @param attestationsRequested The number of attestations to request
+         */
+        let request = await attestationsContract.request(
+          response.body.phoneHash,
+          3
+        );
+        let requestReceipt = await request.sendAndWaitForReceipt({
+          gasPrice: Web3.utils.toWei("0.5", "gwei"),
+        });
+        console.log(`Request receipt: `, requestReceipt);
+      });
+
+      toast.success("requestNewAttestation succeeded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const selectAttestationIssuers = async () => {
+    try {
+        /**
+         * Waits appropriate number of blocks, then selects issuers for previously requested phone number attestations
+         * @param identifier Attestation identifier (e.g. phone hash)
+         * @param account Address of the account
+         */
+        const selectIssuers = await attestationsContract.selectIssuersAfterWait(
+          response.body.phoneHash,
+          kit.defaultAccount
+        );
+        let issuers = await selectIssuers.sendAndWaitForReceipt({
+          gasPrice: Web3.utils.toWei("0.5", "gwei"),
+        });
+        setAttestationIssuers(issuers);
+
+        console.log(`Issuers:`, issuers);
+
+      toast.success("selectAttestationIssuers succeeded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const consoleLogAttestationStats = async () => {
+    /**
+     * Returns the attestation stats of a identifer/account pair
+     * @param identifier Attestation identifier (e.g. phone hash)
+     * @param account Address of the account
+     */
+    const stats = await attestationsContract.getAttestationStat(
       response.body.phoneHash,
-    ]);
-    setMapping(res);
-    console.log("mapping response", res);
-  }
+      kit.defaultAccount
+    );
+    console.log(stats);
+  };
 
   return (
     <>
@@ -224,10 +327,33 @@ function Lookup() {
         onChange={(e) => setPhoneNumber(e.target.value)}
         type="text"
       />
-      <button onClick={() => makeRequest()}>Lookup</button>
+      <button onClick={() => makeRequest()}>Lookup Phone Hash</button>
       <p>Phone Number: {response.body.e164Number}</p>
       <p>Phone Hash: {response.body.phoneHash}</p>
       <p>Pepper: {response.body.pepper}</p>
+      {response.body.phoneHash && (
+        <>
+          <button onClick={() => getIdentifiers()}>
+            Console.log associated addresses
+          </button>
+          <button onClick={() => approveAttestationFee()}>
+            Approve Attesation fee
+          </button>
+        </>
+      )}
+      {attestationsFeeApproved && (
+        <>
+          <button onClick={() => requestNewAttestation()}>
+            Request new attestations
+          </button>
+          <button onClick={() => selectAttestationIssuers()}>
+            Select attestation issuers
+          </button>
+          <button onClick={() => consoleLogAttestationStats()}>
+            console.log attestations stats
+          </button>
+        </>
+      )}
     </>
   );
 }
