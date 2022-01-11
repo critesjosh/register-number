@@ -178,7 +178,7 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
   const [response, setResponse] = useState(defaultResponse);
   // const [phoneNumber, setPhoneNumber] = useState("+13132880080");
   const [mapping, setMapping] = useState(null);
-  const [attestationsFeeApproved, setAttestationFeeAprpoved] = useState(false);
+  const [attestationsFeeApproved, setAttestationFeeApproved] = useState(false);
   const [attestationsContract, setAttestationsContract] = useState(null);
   const [attestationIssuers, setAttestationIssuers] = useState([]);
 
@@ -315,7 +315,7 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
           gasPrice: Web3.utils.toWei("0.5", "gwei"),
         });
       });
-      setAttestationFeeAprpoved(true);
+      setAttestationFeeApproved(true);
       toast.success("approveAttestationFee succeeded");
     } catch (e) {
       toast.error((e as Error).message);
@@ -390,7 +390,7 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
         onChange={(e) => setPhoneNumber(e.target.value)}
         type="text"
       />
-      <button onClick={() => makeRequest()}>Lookup Phone Hash</button>
+      <button onClick={() => lookup()}>Lookup Phone Hash</button>
       <p>Phone Number: {response.body.e164Number}</p>
       <p>Phone Hash: {response.body.phoneHash}</p>
       <p>Pepper: {response.body.pepper}</p>
