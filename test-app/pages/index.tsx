@@ -44,6 +44,7 @@ function App() {
     walletType,
   } = useContractKit();
   const [summary, setSummary] = useState(defaultSummary);
+  const [phoneNumber, setPhoneNumber] = useState("+13132880080");
 
   const fetchSummary = useCallback(async () => {
     if (!address) {
@@ -83,7 +84,7 @@ function App() {
     <>
       <div className="flex justify-center">
         <Connect />
-        <Lookup />
+        <Lookup phoneNumber={phoneNumber} setPhoneNumber={setPhoneNumber} />
       </div>
       <div className="flex flex-row items-center">
         <div className="items-center justify-center">
@@ -162,8 +163,8 @@ function Connect() {
   );
 }
 
-function Lookup() {
-  const { kit, network, performActions } = useContractKit();
+function Lookup({ phoneNumber, setPhoneNumber }) {
+  const { kit, network, performActions, address } = useContractKit();
 
   const defaultResponse = {
     status: "",
@@ -175,7 +176,7 @@ function Lookup() {
   };
 
   const [response, setResponse] = useState(defaultResponse);
-  const [phoneNumber, setPhoneNumber] = useState("+13132880080");
+  // const [phoneNumber, setPhoneNumber] = useState("+13132880080");
   const [mapping, setMapping] = useState(null);
   const [attestationsFeeApproved, setAttestationFeeAprpoved] = useState(false);
   const [attestationsContract, setAttestationsContract] = useState(null);
@@ -207,6 +208,68 @@ function Lookup() {
       limit: res.headers.get("X-RateLimit-Limit"),
       remaining: res.headers.get("X-RateLimit-Remaining"),
     });
+  };
+
+  const lookup = async () => {
+    try {
+      await performActions(async (k) => {
+        let odisUrl, odisPubKey;
+
+        const authSigner = {
+          authenticationMethod: OdisUtils.Query.AuthenticationMethod.WALLET_KEY,
+          contractKit: k,
+        };
+
+        switch (network.chainId.toString(10)) {
+          case "44787":
+            odisUrl =
+              "https://us-central1-celo-phone-number-privacy.cloudfunctions.net";
+            odisPubKey =
+              "kPoRxWdEdZ/Nd3uQnp3FJFs54zuiS+ksqvOm9x8vY6KHPG8jrfqysvIRU0wtqYsBKA7SoAsICMBv8C/Fb2ZpDOqhSqvr/sZbZoHmQfvbqrzbtDIPvUIrHgRS0ydJCMsA";
+            break;
+          case "42220":
+            odisUrl =
+              "https://us-central1-celo-pgpnp-mainnet.cloudfunctions.net";
+            odisPubKey =
+              "FvreHfLmhBjwxHxsxeyrcOLtSonC9j7K3WrS4QapYsQH6LdaDTaNGmnlQMfFY04Bp/K4wAvqQwO9/bqPVCKf8Ze8OZo8Frmog4JY4xAiwrsqOXxug11+htjEe1pj4uMA";
+            break;
+          default:
+            console.log(
+              `Set the NETWORK environment variable to either 'alfajores' or 'mainnet'`
+            );
+        }
+
+        const serviceContext = {
+          odisUrl,
+          odisPubKey,
+        };
+
+        const blsBlindingClient = new WebBlsBlindingClient(
+          serviceContext.odisPubKey
+        );
+        
+        const response =
+          await OdisUtils.PhoneNumberIdentifier.getPhoneNumberIdentifier(
+            phoneNumber,
+            address,
+            authSigner,
+            serviceContext,
+            undefined,
+            undefined,
+            undefined,
+            blsBlindingClient
+          );
+
+        console.log(response);
+      });
+
+      toast.success("succeeded");
+      // await fetchSummary();
+    } catch (e) {
+      console.log(e)
+
+      toast.error((e as Error).message);
+    }
   };
 
   const getIdentifiers = async () => {
@@ -285,21 +348,21 @@ function Lookup() {
 
   const selectAttestationIssuers = async () => {
     try {
-        /**
-         * Waits appropriate number of blocks, then selects issuers for previously requested phone number attestations
-         * @param identifier Attestation identifier (e.g. phone hash)
-         * @param account Address of the account
-         */
-        const selectIssuers = await attestationsContract.selectIssuersAfterWait(
-          response.body.phoneHash,
-          kit.defaultAccount
-        );
-        let issuers = await selectIssuers.sendAndWaitForReceipt({
-          gasPrice: Web3.utils.toWei("0.5", "gwei"),
-        });
-        setAttestationIssuers(issuers);
+      /**
+       * Waits appropriate number of blocks, then selects issuers for previously requested phone number attestations
+       * @param identifier Attestation identifier (e.g. phone hash)
+       * @param account Address of the account
+       */
+      const selectIssuers = await attestationsContract.selectIssuersAfterWait(
+        response.body.phoneHash,
+        kit.defaultAccount
+      );
+      let issuers = await selectIssuers.sendAndWaitForReceipt({
+        gasPrice: Web3.utils.toWei("0.5", "gwei"),
+      });
+      setAttestationIssuers(issuers);
 
-        console.log(`Issuers:`, issuers);
+      console.log(`Issuers:`, issuers);
 
       toast.success("selectAttestationIssuers succeeded");
     } catch (e) {
