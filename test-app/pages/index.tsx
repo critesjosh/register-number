@@ -210,68 +210,6 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
     });
   };
 
-  const lookup = async () => {
-    try {
-      await performActions(async (k) => {
-        let odisUrl, odisPubKey;
-
-        const authSigner = {
-          authenticationMethod: OdisUtils.Query.AuthenticationMethod.WALLET_KEY,
-          contractKit: k,
-        };
-
-        switch (network.chainId.toString(10)) {
-          case "44787":
-            odisUrl =
-              "https://us-central1-celo-phone-number-privacy.cloudfunctions.net";
-            odisPubKey =
-              "kPoRxWdEdZ/Nd3uQnp3FJFs54zuiS+ksqvOm9x8vY6KHPG8jrfqysvIRU0wtqYsBKA7SoAsICMBv8C/Fb2ZpDOqhSqvr/sZbZoHmQfvbqrzbtDIPvUIrHgRS0ydJCMsA";
-            break;
-          case "42220":
-            odisUrl =
-              "https://us-central1-celo-pgpnp-mainnet.cloudfunctions.net";
-            odisPubKey =
-              "FvreHfLmhBjwxHxsxeyrcOLtSonC9j7K3WrS4QapYsQH6LdaDTaNGmnlQMfFY04Bp/K4wAvqQwO9/bqPVCKf8Ze8OZo8Frmog4JY4xAiwrsqOXxug11+htjEe1pj4uMA";
-            break;
-          default:
-            console.log(
-              `Set the NETWORK environment variable to either 'alfajores' or 'mainnet'`
-            );
-        }
-
-        const serviceContext = {
-          odisUrl,
-          odisPubKey,
-        };
-
-        const blsBlindingClient = new WebBlsBlindingClient(
-          serviceContext.odisPubKey
-        );
-        
-        const response =
-          await OdisUtils.PhoneNumberIdentifier.getPhoneNumberIdentifier(
-            phoneNumber,
-            address,
-            authSigner,
-            serviceContext,
-            undefined,
-            undefined,
-            undefined,
-            blsBlindingClient
-          );
-
-        console.log(response);
-      });
-
-      toast.success("succeeded");
-      // await fetchSummary();
-    } catch (e) {
-      console.log(e)
-
-      toast.error((e as Error).message);
-    }
-  };
-
   const getIdentifiers = async () => {
     const attestations = await kit.contracts.getAttestations();
     setAttestationsContract(attestations);
@@ -294,6 +232,10 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
             from: k.defaultAccount,
             gasPrice: Web3.utils.toWei("0.5", "gwei"),
           });
+
+          const cUSDContract = await k.contracts.getStableToken();
+          let allowance = cUSDContract.allowance(k.defaultAccount, attestationsContract.address)
+          //if (allowance.lt(Web3.utils.toWei("0.15", "ether"))
       });
 
       toast.success("sendTransaction succeeded");
@@ -390,7 +332,7 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
         onChange={(e) => setPhoneNumber(e.target.value)}
         type="text"
       />
-      <button onClick={() => lookup()}>Lookup Phone Hash</button>
+      <button onClick={() => makeRequest()}>Lookup Phone Hash</button>
       <p>Phone Number: {response.body.e164Number}</p>
       <p>Phone Hash: {response.body.phoneHash}</p>
       <p>Pepper: {response.body.pepper}</p>
