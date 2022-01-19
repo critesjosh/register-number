@@ -19,10 +19,6 @@ export default async function handler(req, res) {
 
       console.log(req.body);
 
-      phoneNumber = req.body.phoneNumber;
-      account = req.body.account;
-      pepper = req.body.pepper;
-
       switch (req.body.network) {
         case "44787":
           networkURL = "https://alfajores-forno.celo-testnet.org";
@@ -51,39 +47,42 @@ export default async function handler(req, res) {
 
       console.log(attestationsToComplete);
 
+      const postAttestationRequest = async (attestationToComplete) => {
+        const requestBody = {
+          phoneNumber: req.body.phoneNumber,
+          account: req.body.account,
+          issuer: attestationToComplete.issuer,
+          salt: req.body.pepper,
+          smsRetrieverAppSig: undefined,
+          language: "en",
+          securityCodePrefix: getSecurityPrefix(attestationToComplete),
+        };
+    
+        console.log("Attestation Request Body: ", requestBody);
+        const response = await attestationsContract.revealPhoneNumberToIssuer(
+          attestationToComplete.attestationServiceURL,
+          requestBody
+        );
+        return response.json();
+      };
+
       console.log(
         "Responses",
         await Promise.all(attestationsToComplete.map(postAttestationRequest))
       );
 
-      res.status(200).send({ message: "Success" });
+      let responses = await Promise.all(attestationsToComplete.map(postAttestationRequest))
+
+      res.status(200).send({ responses });
       return;
-    } catch {
+    } catch (error) {
+      console.log('Server error:', error)
       res.status(429).json({ error: "Rate limit exceeded" });
     }
   } else {
     res.status(405).send({ message: "Only POST requests allowed" });
     return;
   }
-
-  const postAttestationRequest = async (attestationToComplete) => {
-    const requestBody = {
-      phoneNumber,
-      account,
-      issuer: attestationToComplete.issuer,
-      salt: pepper,
-      smsRetrieverAppSig: undefined,
-      language: "en",
-      securityCodePrefix: getSecurityPrefix(attestationToComplete),
-    };
-
-    console.log("Attestation Request Body: ", requestBody);
-    const response = await attestationsContract.revealPhoneNumberToIssuer(
-      attestationToComplete.attestationServiceURL,
-      requestBody
-    );
-    return response.json();
-  };
 }
 
 const getSecurityPrefix = (attestationToComplete) =>

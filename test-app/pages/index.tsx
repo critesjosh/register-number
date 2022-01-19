@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import Web3 from "web3";
 const OdisUtils = require("@celo/identity").OdisUtils;
 
+
 import { PrimaryButton, SecondaryButton, toast } from "../components";
 
 import { WebBlsBlindingClient } from "../utils/bls-blinding-client";
@@ -22,15 +23,6 @@ function truncateAddress(address: string) {
 }
 
 const networks = [Alfajores, Mainnet];
-
-const defaultSummary = {
-  name: "",
-  address: "",
-  wallet: "",
-  celo: new BigNumber(0),
-  cusd: new BigNumber(0),
-  ceur: new BigNumber(0),
-};
 
 function App() {
   const {
@@ -42,129 +34,12 @@ function App() {
     destroy,
     performActions,
     walletType,
+    getConnectedKit,
   } = useContractKit();
-  const [summary, setSummary] = useState(defaultSummary);
-  const [phoneNumber, setPhoneNumber] = useState("+13132880080");
-
-  const fetchSummary = useCallback(async () => {
-    if (!address) {
-      setSummary(defaultSummary);
-      return;
-    }
-
-    const [accounts, goldToken, cUSD, cEUR] = await Promise.all([
-      kit.contracts.getAccounts(),
-      kit.contracts.getGoldToken(),
-      kit.contracts.getStableToken(StableToken.cUSD),
-      kit.contracts.getStableToken(StableToken.cEUR),
-    ]);
-
-    const [summary, celo, cusd, ceur] = await Promise.all([
-      accounts.getAccountSummary(address).catch((e) => {
-        console.error(e);
-        return defaultSummary;
-      }),
-      goldToken.balanceOf(address),
-      cUSD.balanceOf(address),
-      cEUR.balanceOf(address),
-    ]);
-    setSummary({
-      ...summary,
-      celo,
-      cusd,
-      ceur,
-    });
-  }, [address, kit]);
 
   useEffect(() => {
-    void fetchSummary();
-  }, [fetchSummary]);
-
-  return (
-    <>
-      <div className="flex justify-center">
-        <Connect />
-        <Lookup phoneNumber={phoneNumber} setPhoneNumber={setPhoneNumber} />
-      </div>
-      <div className="flex flex-row items-center">
-        <div className="items-center justify-center">
-          {address && (
-            <div className="w-64 md:w-96 space-y-4 text-gray-700">
-              <div className="mb-4">
-                <div className="text-lg font-bold mb-2 text-gray-900">
-                  Account summary
-                </div>
-                <div className="space-y-2">
-                  <div>Wallet type: {walletType}</div>
-                  <div>Name: {summary.name || "Not set"}</div>
-                  <div className="">Address: {truncateAddress(address)}</div>
-                  <div className="">
-                    Wallet address:{" "}
-                    {summary.wallet
-                      ? truncateAddress(summary.wallet)
-                      : "Not set"}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="text-lg font-bold mb-2 text-gray-900">
-                  Balances
-                </div>
-                <div className="space-y-2">
-                  <div>CELO: {Web3.utils.fromWei(summary.celo.toFixed())}</div>
-                  <div>cUSD: {Web3.utils.fromWei(summary.cusd.toFixed())}</div>
-                  <div>cEUR: {Web3.utils.fromWei(summary.ceur.toFixed())}</div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-function Connect() {
-  const { address, destroy, connect, updateNetwork, network } =
-    useContractKit();
-  return (
-    <>
-      <p>{address}</p>
-      {address ? (
-        <SecondaryButton onClick={destroy}>Disconnect</SecondaryButton>
-      ) : (
-        <SecondaryButton
-          onClick={() =>
-            connect().catch((e) => toast.error((e as Error).message))
-          }
-        >
-          Connect
-        </SecondaryButton>
-      )}
-      <div>
-        <select
-          className="border border-gray-300 rounded px-4 py-2"
-          value={network.name}
-          onChange={async (e) => {
-            const newNetwork = networks.find((n) => n.name === e.target.value);
-            if (newNetwork) {
-              await updateNetwork(newNetwork);
-            }
-          }}
-        >
-          {Object.values(networks).map((n) => (
-            <option key={n.name} value={n.name}>
-              {n.name}
-            </option>
-          ))}
-        </select>
-      </div>
-    </>
-  );
-}
-
-function Lookup({ phoneNumber, setPhoneNumber }) {
-  const { kit, network, performActions, address } = useContractKit();
+    updateNetwork(Alfajores);
+  }, []);
 
   const defaultResponse = {
     status: "",
@@ -175,22 +50,31 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
     },
   };
 
-  const [response, setResponse] = useState(defaultResponse);
-  // const [phoneNumber, setPhoneNumber] = useState("+13132880080");
+  const [phoneNumber, setPhoneNumber] = useState("+13132880080");
+  const [lookupResponse, setLookupResponse] = useState(defaultResponse);
   const [mapping, setMapping] = useState(null);
   const [attestationsFeeApproved, setAttestationFeeApproved] = useState(false);
   const [attestationsContract, setAttestationsContract] = useState(null);
   const [attestationIssuers, setAttestationIssuers] = useState([]);
+  const [codesSent, setCodesSent] = useState(true);
+  const [code0, setCode0] = useState("");
+  const [code1, setCode1] = useState("");
+  const [code2, setCode2] = useState("");
 
-  const makeRequest = async () => {
-    await sendRequestTransaction();
+  const makeRequest = async (endpoint: string) => {
+    if (endpoint == "lookup") await sendRequestTransaction();
 
     const lookupData = {
       network: network.chainId.toString(10),
       phoneNumber: phoneNumber,
+      issuers: attestationIssuers,
+      account: kit.defaultAccount,
+      pepper: lookupResponse.body.pepper,
+      phoneHash: lookupResponse.body.phoneHash,
+      codes: [code0, code1, code2],
     };
 
-    const res = await fetch("/api/lookup", {
+    const res = await fetch(`/api/${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -199,21 +83,30 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
     });
 
     let tmpResponse = await res.clone();
-    console.log(tmpResponse); // log the res.body, not cloning breaks this
+    console.log("Endpoint", endpoint, await tmpResponse.json()); // log the res.body, not cloning breaks this
 
-    setResponse({
-      //@ts-ignore
-      status: res.status,
-      body: await res.json(),
-      limit: res.headers.get("X-RateLimit-Limit"),
-      remaining: res.headers.get("X-RateLimit-Remaining"),
-    });
+    switch (endpoint) {
+      case "lookup":
+        setLookupResponse({
+          //@ts-ignore
+          status: res.status,
+          body: await res.json(),
+          limit: res.headers.get("X-RateLimit-Limit"),
+          remaining: res.headers.get("X-RateLimit-Remaining"),
+        });
+        break;
+      case "getCodes":
+        if (res.status === 200) setCodesSent(true);
+        break;
+      default:
+        console.log("unknown endpoint", endpoint);
+    }
   };
 
   const getIdentifiers = async () => {
-    const attestations = await kit.contracts.getAttestations();
-    setAttestationsContract(attestations);
-    let res = await attestations.lookupIdentifiers([response.body.phoneHash]);
+    let res = await attestationsContract.lookupIdentifiers([
+      lookupResponse.body.phoneHash,
+    ]);
     setMapping(res);
     console.log("mapping response", res);
   };
@@ -233,13 +126,25 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
             gasPrice: Web3.utils.toWei("0.5", "gwei"),
           });
 
-          const cUSDContract = await k.contracts.getStableToken();
-          let allowance = cUSDContract.allowance(k.defaultAccount, attestationsContract.address)
-          //if (allowance.lt(Web3.utils.toWei("0.15", "ether"))
+        const cUSDContract = await k.contracts.getStableToken();
+        const attestations = await k.contracts.getAttestations();
+        setAttestationsContract(attestations);
+
+        let allowance = await cUSDContract.allowance(
+          k.defaultAccount,
+          attestationsContract.address
+        );
+
+        if (
+          allowance.isGreaterThan(
+            new BigNumber(Web3.utils.toWei("0.15", "ether"))
+          )
+        ) {
+          setAttestationFeeApproved(true);
+        }
       });
 
       toast.success("sendTransaction succeeded");
-      // await fetchSummary();
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -273,7 +178,7 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
          * @param attestationsRequested The number of attestations to request
          */
         let request = await attestationsContract.request(
-          response.body.phoneHash,
+          lookupResponse.body.phoneHash,
           3
         );
         let requestReceipt = await request.sendAndWaitForReceipt({
@@ -296,15 +201,25 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
        * @param account Address of the account
        */
       const selectIssuers = await attestationsContract.selectIssuersAfterWait(
-        response.body.phoneHash,
+        lookupResponse.body.phoneHash,
         kit.defaultAccount
       );
-      let issuers = await selectIssuers.sendAndWaitForReceipt({
+
+      let issuersReceipt = await selectIssuers.sendAndWaitForReceipt({
         gasPrice: Web3.utils.toWei("0.5", "gwei"),
       });
+
+      let issuers = issuersReceipt.events?.AttestationIssuerSelected.map(
+        (event) => {
+          if (event.event == "AttestationIssuerSelected") {
+            return event.returnValues.issuer;
+          }
+        }
+      );
+
       setAttestationIssuers(issuers);
 
-      console.log(`Issuers:`, issuers);
+      console.log(`Issuers<Array>:`, issuers);
 
       toast.success("selectAttestationIssuers succeeded");
     } catch (e) {
@@ -319,7 +234,7 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
      * @param account Address of the account
      */
     const stats = await attestationsContract.getAttestationStat(
-      response.body.phoneHash,
+      lookupResponse.body.phoneHash,
       kit.defaultAccount
     );
     console.log(stats);
@@ -327,38 +242,84 @@ function Lookup({ phoneNumber, setPhoneNumber }) {
 
   return (
     <>
-      <input
-        value={phoneNumber}
-        onChange={(e) => setPhoneNumber(e.target.value)}
-        type="text"
-      />
-      <button onClick={() => makeRequest()}>Lookup Phone Hash</button>
-      <p>Phone Number: {response.body.e164Number}</p>
-      <p>Phone Hash: {response.body.phoneHash}</p>
-      <p>Pepper: {response.body.pepper}</p>
-      {response.body.phoneHash && (
+      <div className="flex justify-center">
         <>
-          <button onClick={() => getIdentifiers()}>
-            Console.log associated addresses
-          </button>
-          <button onClick={() => approveAttestationFee()}>
-            Approve Attesation fee
-          </button>
+          <p>{address}</p>
+          {address ? (
+            <SecondaryButton onClick={destroy}>Disconnect</SecondaryButton>
+          ) : (
+            <SecondaryButton
+              onClick={() =>
+                connect().catch((e) => toast.error((e as Error).message))
+              }
+            >
+              Connect
+            </SecondaryButton>
+          )}
+          <div>{network.name}</div>
         </>
-      )}
-      {attestationsFeeApproved && (
         <>
-          <button onClick={() => requestNewAttestation()}>
-            Request new attestations
+          <input
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            type="text"
+          />
+          <button onClick={() => makeRequest("lookup")}>
+            Lookup Phone Hash
           </button>
-          <button onClick={() => selectAttestationIssuers()}>
-            Select attestation issuers
-          </button>
-          <button onClick={() => consoleLogAttestationStats()}>
-            console.log attestations stats
-          </button>
+          <h2>Phone Number lookup response</h2>
+          <p>Phone Number: {lookupResponse.body.e164Number}</p>
+          <p>Phone Hash: {lookupResponse.body.phoneHash}</p>
+          <p>Pepper: {lookupResponse.body.pepper}</p>
+          {lookupResponse.body.phoneHash && (
+            <>
+              <button onClick={() => getIdentifiers()}>
+                Console.log associated addresses
+              </button>
+              <button onClick={() => approveAttestationFee()}>
+                Approve Attesation fee
+              </button>
+            </>
+          )}
+          <h2>Request Attestations</h2>
+          {attestationsFeeApproved && (
+            <>
+              <button onClick={() => requestNewAttestation()}>
+                Request new attestations
+              </button>
+              <button onClick={() => selectAttestationIssuers()}>
+                Select attestation issuers
+              </button>
+              <button onClick={() => makeRequest("getCodes")}>Get codes</button>
+              <button onClick={() => consoleLogAttestationStats()}>
+                console.log attestations stats
+              </button>
+            </>
+          )}
+          <h2>Send Codes</h2>
+          {codesSent && (
+            <>
+              <input
+                value={code0}
+                onChange={(e) => setCode0(e.target.value)}
+                type="text"
+              />
+              <input
+                value={code1}
+                onChange={(e) => setCode1(e.target.value)}
+                type="text"
+              />
+              <input
+                value={code2}
+                onChange={(e) => setCode2(e.target.value)}
+                type="text"
+              />
+              <button onClick={() => makeRequest('sendCodes')}>Send the Codes</button>
+              <br></br>
+            </>
+          )}
         </>
-      )}
+      </div>
     </>
   );
 }
@@ -367,7 +328,7 @@ export default function WrappedApp() {
   return (
     <ContractKitProvider
       dapp={{
-        name: "My awesome dApp",
+        name: "Register Phone Number",
         description: "My awesome description",
         url: "https://example.com",
         icon: "",
@@ -377,3 +338,6 @@ export default function WrappedApp() {
     </ContractKitProvider>
   );
 }
+
+const getSecurityPrefix = (attestationToComplete) =>
+  attestationToComplete.name[10];

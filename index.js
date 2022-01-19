@@ -113,6 +113,26 @@ async function requestCodes() {
   )
 }
 
+const postAttestationRequest = async (attestationToComplete) => {
+  const attestations = await contractkit.contracts.getAttestations()
+
+  const requestBody = {
+    phoneNumber,
+    account: account,
+    issuer: attestationToComplete.issuer,
+    salt: pepper,
+    smsRetrieverAppSig: undefined,
+    language: 'en',
+    securityCodePrefix: getSecurityPrefix(attestationToComplete)
+  }
+  console.log('Attestation Request Body: ', requestBody)
+  const response = await attestations.revealPhoneNumberToIssuer(
+    attestationToComplete.attestationServiceURL,
+    requestBody
+  )
+  return response.json()
+}
+
 // verify an attestation request with the given code
 
 async function verify(contractkit, base64Code) {
@@ -190,26 +210,6 @@ async function verify(contractkit, base64Code) {
         console.log('Prefix does not match any issuers')
       }
 
-}
-
-const postAttestationRequest = async (attestationToComplete) => {
-    const attestations = await contractkit.contracts.getAttestations()
-
-    const requestBody = {
-      phoneNumber,
-      account: account,
-      issuer: attestationToComplete.issuer,
-      salt: pepper,
-      smsRetrieverAppSig: undefined,
-      language: 'en',
-      securityCodePrefix: getSecurityPrefix(attestationToComplete)
-    }
-    console.log('Attestation Request Body: ', requestBody)
-    const response = await attestations.revealPhoneNumberToIssuer(
-      attestationToComplete.attestationServiceURL,
-      requestBody
-    )
-    return response.json()
 }
 
 // NOTE: this is currently a janky way of getting a prefix code for alfajores, need to update for mainnet
