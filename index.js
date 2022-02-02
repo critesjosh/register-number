@@ -323,6 +323,7 @@ async function main() {
   await verify(contractkit, code2);
   let code3 = await ask("Enter third code");
   await verify(contractkit, code3);
+  await getIdentifiers();
 }
 
 main();
