@@ -316,13 +316,13 @@ async function main() {
   await registerAccountAndWallet();
   await getHashAndPepper();
   await getIdentifiers();
-  // await requestCodes();
-  // let code1 = await ask("Enter first code");
-  // await verify(contractkit, code1);
-  // let code2 = await ask("Enter second code");
-  // await verify(contractkit, code2);
-  // let code3 = await ask("Enter third code");
-  // await verify(contractkit, code3);
+  await requestCodes();
+  let code1 = await ask("Enter first code");
+  await verify(contractkit, code1);
+  let code2 = await ask("Enter second code");
+  await verify(contractkit, code2);
+  let code3 = await ask("Enter third code");
+  await verify(contractkit, code3);
 }
 
 main();
