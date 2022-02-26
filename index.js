@@ -56,6 +56,7 @@ async function init() {
   console.log('contractkit account', contractkit.defaultAccount);
   const balance = await contractkit.celoTokens.balancesOf(account);
   console.log('Celo balance', balance.CELO.toFixed());
+  console.log('cUSD balance', balance.cUSD.toFixed());
 }
 
 // lookup phone number from ODIS, get the identifier (pepper) and phone number hash
@@ -320,11 +321,11 @@ async function main() {
   await getHashAndPepper();
   await getIdentifiers();
   await requestCodes();
-  let code1 = await ask("Enter first code");
+  let code1 = await ask("Enter first code: ");
   await verify(contractkit, code1);
-  let code2 = await ask("Enter second code");
+  let code2 = await ask("Enter second code: ");
   await verify(contractkit, code2);
-  let code3 = await ask("Enter third code");
+  let code3 = await ask("Enter third code: ");
   await verify(contractkit, code3);
   await getIdentifiers();
 }

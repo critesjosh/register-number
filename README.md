@@ -35,3 +35,9 @@ Run script with
 yarn sample-script
 ```
 
+## Troubleshooting
+
+If you see any of the following errors:
+"Error: insufficient funds for gas * price + value + gatewayFee" - means you're balance of Celo tokens is too low, use the faucet to top up
+"transfer value exceeded balance of sender" - means you don't have enough stable coin balance, eg cUSD. Sometimes the faucet doesn't send cUSD so you may need to get it from another source
+"Error: execution reverted: Unknown account" - typically means you're using a phone number that's already been registered with a different account
