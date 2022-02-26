@@ -4,7 +4,10 @@
   "description": "A repo to show how to register a phone number with ODIS on Celo",
   "main": "index.js",
   "scripts": {
+    "new-account": "node printNewAccount.js",
+    "sample-script": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+
   },
   "repository": {
     "type": "git",

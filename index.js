@@ -34,7 +34,7 @@ function ask(query) {
 }
 
 // setup web3, contractkit, add private key to contractkit
-function init() {
+async function init() {
   switch (network) {
     case "alfajores":
       networkURL = "https://alfajores-forno.celo-testnet.org";
@@ -54,6 +54,8 @@ function init() {
   );
   contractkit.connection.defaultAccount = account;
   console.log('contractkit account', contractkit.defaultAccount);
+  const balance = await contractkit.celoTokens.balancesOf(account);
+  console.log('Celo balance', balance.CELO.toFixed());
 }
 
 // lookup phone number from ODIS, get the identifier (pepper) and phone number hash
@@ -246,7 +248,7 @@ async function lookup() {
     contractKit: contractkit,
   };
 
-  switch (process.env.NETWORK) {
+  switch (network) {
     case "alfajores":
       odisUrl =
         "https://us-central1-celo-phone-number-privacy.cloudfunctions.net";
@@ -312,7 +314,8 @@ async function main() {
   phoneNumber = await ask(
     "What phone number do you want to query? (+11234567890)"
   );
-  init();
+
+  await init();
   await registerAccountAndWallet();
   await getHashAndPepper();
   await getIdentifiers();
