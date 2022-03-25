@@ -2,7 +2,7 @@
 
 A repo to show how to register a phone number with ODIS on Celo.
 
-`index.js` includes scripts to request verification codes from and verify them with the Attesations contract.
+`index.js` includes scripts to request verification codes from and verify them with the Attesations contract (currently only working on Alfajores)
 
 `./test-app/` is a work in progress nextjs application for a UI for registering a phone number (not currently functional).
 
@@ -34,6 +34,16 @@ Run script with
 ```
 yarn sample-script
 ```
+
+The script will run through the basic steps of registering a phone number with the Celo network:
+1. Registers your account and wallet with the Account smart contract
+2. Retrieves a hash for your phone number using ODIS
+3. Requests the Attestations smart contract to send 3 SMS codes to your phone number associated with the hash (paying a small fee in cUSD)
+4. You'll be prompted to enter each of the 3 codes which will be sent to the Attestations contract along with your phone hash and account address to associate them
+5. Finally you can check that everything worked by sending your phone hash to the Attestations contract and retrieve the stored account address
+
+
+For more details see the [Identity Overview](https://docs.celo.org/celo-codebase/protocol/identity)
 
 ## Troubleshooting
 
