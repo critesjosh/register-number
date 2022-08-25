@@ -43,7 +43,7 @@ The script will run through the basic steps of registering a phone number with t
 5. Finally you can check that everything worked by sending your phone hash to the Attestations contract and retrieve the stored account address
 
 
-For more details see the [Identity Overview](https://docs.celo.org/celo-codebase/protocol/identity)
+For more details see the [Identity Overview](https://docs.celo.org/protocol/identity#introduction-to-identity-on-celo)
 
 ## Troubleshooting
 
